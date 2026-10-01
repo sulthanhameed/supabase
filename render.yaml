@@ -1,0 +1,58 @@
+# ─────────────────────────────────────────────────────────────
+#  Render Blueprint (must live at the REPO ROOT)
+#  Render → New → Blueprint → pick this repo → Apply
+#  Creates:  khang-backend (Express API)  +  khang-db (Postgres)
+# ─────────────────────────────────────────────────────────────
+services:
+  - type: web
+    name: khang-backend
+    runtime: node
+    plan: free
+    rootDir: backend                 # Root Directory
+    buildCommand: npm run build      # Build Command  → bash build.sh (npm ci --omit=dev)
+    startCommand: npm start          # Start Command  → node start.js (auto-installs if needed, then server.js)
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: khang-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_URL             # ← set to your Vercel URL after the frontend deploys
+        sync: false
+      - key: OWNER_EMAIL
+        value: sultham456@gmail.com
+      - key: ADMIN_EMAIL
+        value: admin@khang.com
+      - key: ADMIN_PASSWORD
+        value: admin123
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_SECURE
+        value: "false"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: FAST2SMS_API_KEY
+        sync: false
+
+databases:
+  - name: khang-db
+    plan: free
+    databaseName: khang
+    user: khang
