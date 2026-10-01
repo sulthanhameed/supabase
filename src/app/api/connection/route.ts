@@ -8,7 +8,13 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   if (!USE_REMOTE_BACKEND) {
-    return Response.json({ mode: "built-in", backend: "same server (src/app/api)", ok: true, hint: "Set NEXT_PUBLIC_API_URL to connect a separately hosted Express backend." });
+    return Response.json({
+      mode: "built-in",
+      backend: "same server (src/app/api)",
+      database: "supabase",
+      ok: true,
+      hint: "Using the built-in API with the Supabase Postgres backend (DATABASE_URL).",
+    });
   }
   const started = Date.now();
   try {
@@ -16,6 +22,6 @@ export async function GET() {
     const body = await res.json().catch(() => ({}));
     return Response.json({ mode: "remote", backend: BACKEND_URL, ok: res.ok && body.ok === true, status: res.status, latencyMs: Date.now() - started });
   } catch (err) {
-    return Response.json({ mode: "remote", backend: BACKEND_URL, ok: false, error: (err as Error).message, hint: "Is the Render service running? Is FRONTEND_URL set on the backend for CORS?" }, { status: 502 });
+    return Response.json({ mode: "remote", backend: BACKEND_URL, ok: false, error: (err as Error).message, hint: "Is the API server running and is CORS configured for this domain?" }, { status: 502 });
   }
 }

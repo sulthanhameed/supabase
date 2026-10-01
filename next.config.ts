@@ -1,31 +1,14 @@
 import type { NextConfig } from "next";
-import { createRequire } from "node:module";
-import { existsSync } from "node:fs";
-import path from "node:path";
 
 /**
- * Frontend build config (works from repo root AND from frontend/ as Root Directory).
+ * Next.js build config — the app is ONE deployment (frontend + built-in API
+ * in src/app/api) backed by a Supabase Postgres database (DATABASE_URL).
  *
- * Backend URL priority:
- *   1. NEXT_PUBLIC_API_URL env var (Vercel → Settings → Environment Variables)
- *   2. backendUrl inside connect.js (./connect.js or ../connect.js)
- *   3. "" → built-in API on the same server (needs DATABASE_URL)
+ * NEXT_PUBLIC_API_URL is normally EMPTY (built-in API mode). Set it only if
+ * you ever host the API separately from the frontend.
  */
-const require = createRequire(import.meta.url);
-const candidates = [path.resolve(process.cwd(), "connect.js"), path.resolve(process.cwd(), "../connect.js")];
-const connectFile = candidates.find((p) => existsSync(p));
-let connection: { resolvedBackendUrl?: string } = {};
-try {
-  connection = connectFile ? require(connectFile) : {};
-} catch {
-  connection = {};
-}
-
-const envUrl = (process.env.NEXT_PUBLIC_API_URL || "").trim().replace(/\/$/, "");
-const backendUrl = envUrl || connection.resolvedBackendUrl || "";
-
 const nextConfig: NextConfig = {
-  env: { NEXT_PUBLIC_API_URL: backendUrl },
+  env: { NEXT_PUBLIC_API_URL: (process.env.NEXT_PUBLIC_API_URL || "").trim().replace(/\/$/, "") },
   images: { remotePatterns: [{ protocol: "https", hostname: "**" }] },
 };
 

@@ -37,10 +37,6 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules",
-    "backend",
-    "database",
-    "frontend",
-    "scripts"
+    "node_modules"
   ]
 }

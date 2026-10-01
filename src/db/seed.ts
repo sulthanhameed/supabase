@@ -1,6 +1,7 @@
 import { db } from "@/db";
+import { SCHEMA_STATEMENTS } from "@/db/ddl";
 import { categories, products, reviews, users } from "@/db/schema";
-import { count } from "drizzle-orm";
+import { count, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
 const IMG = {
@@ -187,41 +188,62 @@ export function ensureSeeded() {
   return seedPromise;
 }
 
+/** Advisory-lock key so only ONE serverless instance bootstraps at a time. */
+const BOOTSTRAP_LOCK = 0x4b48414e; // "KHAN"
+
+/**
+ * Creates every table and seeds the menu + admin account the first time the
+ * app touches a FRESH database (no manual SQL needed), inside ONE locked
+ * transaction. Against an already-set-up database every step is a no-op.
+ */
 async function seed() {
-  const [{ value: catCount }] = await db.select({ value: count() }).from(categories);
-  if (Number(catCount) === 0) {
-    const inserted = await db.insert(categories).values(CATEGORY_SEED).returning();
-    const bySlug = new Map(inserted.map((c) => [c.slug, c.id]));
-    await db.insert(products).values(
-      PRODUCT_SEED.map((p) => ({
-        name: p.name,
-        slug: p.slug,
-        description: p.description,
-        ingredients: p.ingredients,
-        price: p.price,
-        image: p.image,
-        categoryId: bySlug.get(p.category)!,
-        rating: p.rating,
-        reviewsCount: p.reviewsCount,
-        isFeatured: !!p.isFeatured,
-        isVeg: !!p.isVeg,
-      })),
-    );
-  }
+  await db.transaction(async (tx) => {
+    // Take a transaction-scoped advisory lock: concurrent serverless instances
+    // wait here instead of racing the CREATE TABLE / seed inserts.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(${BOOTSTRAP_LOCK})`);
 
-  const [{ value: reviewCount }] = await db.select({ value: count() }).from(reviews);
-  if (Number(reviewCount) === 0) {
-    await db.insert(reviews).values(REVIEW_SEED.map((r) => ({ ...r, productId: null })));
-  }
+    // 1 · Create the schema (same DDL as supabase/migrations/*).
+    for (const statement of SCHEMA_STATEMENTS) {
+      await tx.execute(sql.raw(statement));
+    }
 
-  const [{ value: userCount }] = await db.select({ value: count() }).from(users);
-  if (Number(userCount) === 0) {
-    await db.insert(users).values({
-      name: "Khang Admin",
-      email: "admin@khang.com",
-      passwordHash: await bcrypt.hash("admin123", 10),
-      role: "admin",
-      phone: "+91 90000 00000",
-    });
-  }
+    // 2 · Seed the menu on first boot.
+    const [{ value: catCount }] = await tx.select({ value: count() }).from(categories);
+    if (Number(catCount) === 0) {
+      const inserted = await tx.insert(categories).values(CATEGORY_SEED).returning();
+      const bySlug = new Map(inserted.map((c) => [c.slug, c.id]));
+      await tx.insert(products).values(
+        PRODUCT_SEED.map((p) => ({
+          name: p.name,
+          slug: p.slug,
+          description: p.description,
+          ingredients: p.ingredients,
+          price: p.price,
+          image: p.image,
+          categoryId: bySlug.get(p.category)!,
+          rating: p.rating,
+          reviewsCount: p.reviewsCount,
+          isFeatured: !!p.isFeatured,
+          isVeg: !!p.isVeg,
+        })),
+      );
+    }
+
+    const [{ value: reviewCount }] = await tx.select({ value: count() }).from(reviews);
+    if (Number(reviewCount) === 0) {
+      await tx.insert(reviews).values(REVIEW_SEED.map((r) => ({ ...r, productId: null })));
+    }
+
+    // 3 · Admin account (override with ADMIN_EMAIL / ADMIN_PASSWORD env vars).
+    const [{ value: userCount }] = await tx.select({ value: count() }).from(users);
+    if (Number(userCount) === 0) {
+      await tx.insert(users).values({
+        name: "Khang Admin",
+        email: process.env.ADMIN_EMAIL || "admin@khang.com",
+        passwordHash: await bcrypt.hash(process.env.ADMIN_PASSWORD || "admin123", 10),
+        role: "admin",
+        phone: "+91 90000 00000",
+      });
+    }
+  });
 }

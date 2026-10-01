@@ -2,12 +2,11 @@ import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
 /**
- * Database client for the BUILT-IN API (single-server mode).
+ * Database client — talks to the Supabase Postgres backend via DATABASE_URL.
  *
- * When the frontend is deployed separately (NEXT_PUBLIC_API_URL set) the
- * database is never used, so nothing here may throw at import/build time.
- * The pool and drizzle instance are created lazily on first real use and
- * only then complain if DATABASE_URL is missing.
+ * Nothing here may throw at import/build time. The pool and drizzle
+ * instance are created lazily on first real use and only then complain
+ * if DATABASE_URL is missing.
  */
 const globalForDb = globalThis as typeof globalThis & {
   __khangPool?: Pool;
@@ -19,10 +18,15 @@ function getDb(): NodePgDatabase {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     throw new Error(
-      "DATABASE_URL is required for the built-in API. Either set it, or set NEXT_PUBLIC_API_URL to use the separate Express backend.",
+      "DATABASE_URL is required (Supabase → Project Settings → Database → Connection string → URI).",
     );
   }
-  const pool = new Pool({ connectionString: databaseUrl });
+  // Supabase (and every other hosted Postgres) requires SSL; local Postgres does not.
+  const isLocal = /localhost|127\.0\.0\.1/.test(databaseUrl);
+  const pool = new Pool({
+    connectionString: databaseUrl,
+    ssl: isLocal ? undefined : { rejectUnauthorized: false },
+  });
   const instance = drizzle(pool);
   globalForDb.__khangPool = pool;
   globalForDb.__khangDb = instance;

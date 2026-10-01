@@ -1,103 +1,119 @@
-# 🚀 DEPLOY — exact settings (copy these into Render / Vercel)
+# 🚀 DEPLOY — Supabase (backend) + Vercel (app)
 
-Repository layout (push the whole repo to GitHub):
+Two things to create, about 10 minutes total:
+
 ```
-repo/
-├── render.yaml      ← Render Blueprint (root)  → backend + Postgres
-├── connect.js       ← join file (backendUrl / frontendUrl)
-├── backend/         ← Root Directory for the API service
-├── frontend/        ← Root Directory for the website
-└── database/        ← optional manual SQL
+1) Supabase project   → gives you DATABASE_URL   (the backend: hosted Postgres)
+2) Vercel project     → runs the whole Next.js app (website + built-in API)
 ```
 
 ---
 
-## 1) DATABASE + BACKEND on Render  (one click via Blueprint)
+## 1) Backend — create the Supabase project
 
-**Render → New → Blueprint → select repo → Apply.**  `render.yaml` creates `khang-db` (Postgres) and `khang-backend`.
+1. Go to **[supabase.com](https://supabase.com)** → **New project**.
+2. Name: `khang-restaurant` · pick a strong **database password** (save it!) ·
+   Region: **Mumbai (ap-south-1)** — closest to India.
+3. Wait ~2 min for the project to provision.
 
-If you create the Web Service manually instead, use exactly:
+### Get the connection string (this is your `DATABASE_URL`)
+
+**Project Settings → Database → Connection string → URI** and choose the
+**Session pooler** (recommended — it works over IPv4 from Vercel):
+
+```
+postgresql://postgres.xxxxxxxxxxxx:[YOUR-PASSWORD]@aws-0-ap-south-1.pooler.supabase.com:5432/postgres
+```
+
+Replace `[YOUR-PASSWORD]` with the database password you chose.
+> If the password contains special characters (like `@` or `#`), use the
+> **percent-encoded** URI that the Supabase dashboard shows, or URL-encode them yourself.
+
+### Create the tables (optional!)
+
+Pick **one** — all three end with the same database:
+
+| Option | How |
+|---|---|
+| **A · Do nothing (recommended)** | The app creates every table and seeds the menu + admin on the **first request** after you deploy. |
+| B · Supabase SQL Editor | Open **SQL Editor → New query**, paste `supabase/migrations/20260101000000_init.sql`, **Run**; then paste `supabase/seed.sql`, **Run**. |
+| C · Supabase CLI | `npm i -g supabase` → `supabase link --project-ref <your-ref>` → `supabase db push` |
+
+---
+
+## 2) App — deploy on Vercel
+
+**Vercel → Add New → Project → import this repo**, then:
 
 | Setting | Value |
 |---|---|
-| Runtime | Node |
-| **Root Directory** | `backend` |
-| **Build Command** | `npm run build`  (runs `bash build.sh` → `npm ci --omit=dev`) |
-| **Start Command** | `npm start`  (runs `node start.js` → installs deps if missing → `server.js`) |
-| Health Check Path | `/api/health` |
-| Node version | **22** (`.nvmrc` / `NODE_VERSION=22`) |
+| Framework Preset | Next.js (auto-detected) |
+| **Root Directory** | **repo root** (leave as `./` — do NOT pick a subfolder) |
+| Build Command | `npm run build` (default) |
+| Install Command | `npm ci` (default) |
+| Node.js Version | **22** (from `.nvmrc`) |
 
-Environment variables (Render → Environment):
+Environment variables (Production **and** Preview):
 
 | Key | Value |
 |---|---|
-| `DATABASE_URL` | Internal connection string of `khang-db` |
-| `JWT_SECRET` | any long random string |
-| `FRONTEND_URL` | `https://<your-app>.vercel.app` (add after step 2; comma-separate several) |
-| `OWNER_EMAIL` | `sultham456@gmail.com` |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` | `smtp.gmail.com` / `587` / `false` |
+| `DATABASE_URL` | the Supabase **Session pooler URI** from step 1 |
+| `JWT_SECRET` | any long random string (e.g. from `openssl rand -hex 32`) |
+| `OWNER_EMAIL` | `sultham456@gmail.com` (gets order confirmations) |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` | `smtp.gmail.com` / `587` / `false` *(optional — e-mails)* |
 | `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | Gmail address / **App Password** / Gmail address |
-| `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | from Razorpay dashboard |
-| `FAST2SMS_API_KEY` | optional |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | `admin@khang.com` / `admin123` (change!) |
+| `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | from the Razorpay dashboard *(optional — online payments)* |
+| `FAST2SMS_API_KEY` | *(optional — order SMS)* |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | `admin@khang.com` / `admin123` (first-boot admin, change it!) |
 
-✅ Test: `https://khang-backend.onrender.com/api/health` → `{"ok":true,...}`
-Tables are created and the menu seeded automatically on first boot (no manual SQL needed).
+Click **Deploy**.
+
+> Do **not** set `NEXT_PUBLIC_API_URL` — the app uses its own built-in API.
 
 ---
 
-## 2) FRONTEND on Vercel
+## 3) Verify
 
-**Vercel → Add New → Project → import repo**, then:
-
-| Setting | Value |
+| Check | Expected |
 |---|---|
-| Framework Preset | Next.js |
-| **Root Directory** | `frontend`  ← click *Edit* and pick the folder |
-| **Install Command** | `npm ci` |
-| **Build Command** | `npm run build` |
-| **Output Directory** | `.next` (leave default) |
-| Node.js Version | **22** (from `frontend/.nvmrc`) |
-
-Environment variable (Production + Preview):
-
-| Key | Value |
-|---|---|
-| `NEXT_PUBLIC_API_URL` | `https://khang-backend.onrender.com`  (your Render URL, **no trailing slash**) |
-
-> Do **not** add `DATABASE_URL` on Vercel — the frontend never touches the database.
-
-✅ Test: `https://<your-app>.vercel.app/api/connection` → `{"mode":"remote","ok":true}`
+| `https://<your-app>.vercel.app/api/health` | `{"ok":true}` |
+| `https://<your-app>.vercel.app/api/connection` | `{"mode":"built-in","database":"supabase","ok":true}` |
+| Open the site | menu loads (tables + seed created on first request) |
+| Admin login | `admin@khang.com` / `admin123` |
 
 ---
 
-## 3) Join them
-1. Copy the Vercel URL → Render → `khang-backend` → Environment → `FRONTEND_URL` → Save (auto-redeploys).
-2. (Optional) also write both URLs into `connect.js` and commit — both apps read it as a fallback.
+## Local development
+
+```bash
+cp .env.example .env         # fill DATABASE_URL (Supabase URI) + JWT_SECRET
+npm install
+npm run dev                  # http://localhost:3000
+```
+
+You can point `DATABASE_URL` at your hosted Supabase project, or run Postgres
+locally with the Supabase CLI stack (`supabase start` → use the local URI it
+prints, e.g. `postgresql://postgres:postgres@127.0.0.1:54322/postgres`).
+
+Useful extras:
+
+```bash
+npm run db:studio            # browse the data (Drizzle Studio)
+npx supabase db reset        # local Supabase stack: re-apply migration + seed
+```
 
 ---
-
-## Frontend on Render instead of Vercel (alternative)
-`frontend/render.yaml` is included. Manual settings: Root Directory `frontend`, Build `npm ci && npm run build`, Start `npm start`, env `NEXT_PUBLIC_API_URL`.
-
----
-
-## Frontend on Render (if you host the website on Render instead of Vercel)
-| Setting | Value |
-|---|---|
-| **Root Directory** | `frontend` |
-| **Build Command** | `npm ci && npm run build`  ← replace Render's default `yarn install; yarn build` |
-| **Start Command** | `npm start` |
-| Env | `NEXT_PUBLIC_API_URL=https://<backend>.onrender.com` |
-| Node | 22 (auto from `frontend/.nvmrc`) |
 
 ## Common failures & fixes
+
 | Symptom | Cause | Fix |
 |---|---|---|
-| **`Exited with status 127` · `next: not found` · `eslint-visitor-keys… The engine "node" is incompatible… Got "20.18.0"`** | Node 20.18 is too old for one dependency, so the install aborted and `next` was never installed | Fixed in repo: `.nvmrc` = **22** and `engines.node >= 20.19`. Pull the latest commit and redeploy. Also set Build Command to `npm ci && npm run build` (yarn now works too, but npm is the intended manager). |
-| Render: `Cannot find module 'express'` | Root Directory not `backend`, or build step skipped | Root Directory = `backend`; Build = `npm run build`. `npm start` now also self-installs as a fallback |
-| Render: `DATABASE_URL is required` | DB env var missing | Link `khang-db` → `DATABASE_URL` |
-| Vercel build: `DATABASE_URL is required` | `NEXT_PUBLIC_API_URL` missing so it built in single-server mode | Add `NEXT_PUBLIC_API_URL` and redeploy |
-| Browser: CORS error / login fails | `FRONTEND_URL` on Render doesn't match the Vercel domain | Set exact `https://…vercel.app` (no slash) |
-| Vercel: "No Next.js version detected" | Root Directory left at repo root or wrong folder | Root Directory = `frontend` |
-| Emails not arriving | SMTP vars missing / not an App Password | Use Gmail App Password in `SMTP_PASS` |
+| Build fails: `DATABASE_URL is required` | You set `NEXT_PUBLIC_API_URL` by mistake, or the error appears at runtime only | Don't set `NEXT_PUBLIC_API_URL`; make sure `DATABASE_URL` is set on Vercel |
+| `password authentication failed for user postgres` | Password wrong / not URL-encoded | Reset the DB password in Supabase and re-copy the URI from the dashboard |
+| `ENOTFOUND` / `connection timed out` | Using the **direct** `db.<ref>.supabase.com` host (IPv6-only) from Vercel | Use the **Session pooler** URI (`…pooler.supabase.com:5432`) |
+| `no schema has been selected to create in` / permission errors | Wrong database in the URI | The URI must end in `/postgres` |
+| `502`/`500` on `/api/health` | Supabase project paused (free tier after ~1 week idle) | Supabase dashboard → Restore project |
+| Menu empty after deploy | First request still bootstrapping, or tables were created empty | Reload once; check Supabase → Table Editor; the app seeds itself only into an **empty** database |
+| Login says invalid credentials | Admin account not created yet or password changed | First request creates `admin@khang.com` / `admin123` (or your `ADMIN_EMAIL`/`ADMIN_PASSWORD`) |
+| E-mails not arriving | SMTP vars missing / not an App Password | Use a Gmail **App Password** in `SMTP_PASS` |
+| Vercel: build works but pages error | Env vars added only to Preview, not Production | Add them to **Production** too and redeploy |

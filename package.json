@@ -1,18 +1,15 @@
 {
   "name": "khang-restaurant",
   "private": true,
+  "description": "Khang Chinese Restaurant & Dimsum — Next.js app (frontend + built-in API) with a Supabase Postgres backend",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "export:frontend": "node scripts/export-frontend.mjs",
-    "connect": "node scripts/connect.mjs",
-    "backend": "npm --prefix backend start",
-    "backend:install": "npm --prefix backend run build",
-    "backend:setup": "npm --prefix backend run build",
-    "backend:dev": "npm --prefix backend run dev"
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@types/nodemailer": "^8.0.1",

@@ -1,10 +1,10 @@
 /**
  * Server-side data access for the FRONTEND.
  *
- * When NEXT_PUBLIC_API_URL is set (frontend hosted on Vercel, backend on Render),
- * every read goes over REST to the Express backend — the frontend never touches
- * the database. When it's empty (single all-in-one deployment / local preview),
- * we read straight from Postgres via the built-in queries.
+ * Normally (all-in-one Supabase deployment) NEXT_PUBLIC_API_URL is empty and
+ * we read straight from the Supabase Postgres backend via the built-in
+ * queries. When a URL is set, every read goes over REST to that separately
+ * hosted API instead.
  */
 import type { CategoryDTO, OrderDTO, ProductDTO } from "@/lib/types";
 import { USE_REMOTE_BACKEND, apiUrl } from "@/config/backend";
